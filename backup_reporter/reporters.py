@@ -2,6 +2,8 @@ import boto3
 import json
 import logging
 import pytz
+import os
+import hashlib
 
 from abc import ABC
 from datetime import datetime
@@ -206,6 +208,78 @@ class FilesBucketReporterBackupReporter(BackupReporter):
         self.metadata.size = round(latest_backup["size"]/1024/1024, 1)
         self.metadata.time = 0
 
+        return self.metadata
+
+class FilesReporterBackupReporter(BackupReporter):
+    '''
+        Report about backups from plain files. Usually they are 1 file per 1 backup, but different schemes are available.
+    '''
+    def __init__(
+            self,
+            aws_access_key_id: str,
+            aws_secret_access_key: str,
+            aws_region: str,
+            s3_path: str,
+            customer: str,
+            supposed_backups_count: str,
+            description: str,
+            files_mask: str,
+            backups_dir: str,
+            aws_endpoint_url: str = None) -> None:
+
+        super().__init__(
+            aws_access_key_id = aws_access_key_id,
+            aws_secret_access_key = aws_secret_access_key,
+            aws_region = aws_region,
+            s3_path = s3_path,
+            customer = customer,
+            supposed_backups_count = supposed_backups_count,
+            type = "Files",
+            description = description,
+            aws_endpoint_url = aws_endpoint_url)
+
+        self.files_mask = files_mask
+        self.backups_dir = backups_dir
+
+    def _gather_metadata(self) -> BackupMetadata:
+        '''
+            Gather information about backup from files in the host
+        '''
+        latest_backup = {"key": None, "last_modified": datetime(2000, 1, 1, tzinfo=pytz.UTC), "size": 0} # Default latest backup
+        count_of_backups = 0
+        # Get latest backup file
+        for dirpath, _, filenames in os.walk(self.backups_dir):
+            for filename in filenames:
+                if fnmatch(filename, self.files_mask):
+                    count_of_backups += 1
+                    filepath = os.path.join(dirpath, filename)
+                    try:
+                        stat = os.stat(filepath)
+                    except FileNotFoundError:
+                        continue
+                    mtime = datetime.fromtimestamp(stat.st_mtime, tz=pytz.UTC).replace(microsecond=0)
+                    if mtime > latest_backup["last_modified"]:
+                        latest_backup = {"key": filepath, "last_modified": mtime, "size": stat.st_size}
+
+        if latest_backup["key"]: # If at least one file exists
+            sha1 = hashlib.sha1()
+            try:
+                with open(latest_backup["key"], "rb") as f:
+                    while chunk := f.read(8192):
+                        sha1.update(chunk)
+                self.metadata.sha1sum = sha1.hexdigest()
+            except Exception as e:
+                logging.error(f"Can not read the file!")
+
+        self.metadata.count_of_backups = count_of_backups
+        self.metadata.last_backup_date = latest_backup["last_modified"]
+        self.metadata.backup_name = os.path.basename(latest_backup["key"])
+        self.metadata.placement = self.backups_dir
+        self.metadata.size = round(latest_backup["size"]/1024/1024, 1)
+        self.metadata.time = 0
+
+        logging.info("Gather metadata success")
+        logging.debug(self.metadata)
         return self.metadata
 
 class S3MariadbBackupReporter(BackupReporter):

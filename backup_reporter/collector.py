@@ -36,7 +36,7 @@ class BackupCollector:
             aws_region: str,
             s3_path: str,
             aws_endpoint_url: str = None) -> BackupMetadata:
-        
+
         kwargs = {
            "aws_access_key_id": aws_access_key_id,
            "aws_secret_access_key": aws_secret_access_key,
@@ -54,7 +54,7 @@ class BackupCollector:
         metadata_file_name = "/".join(s3_path.split("/")[3:])
         s3_path = s3_path.split("/")[2]
         metadata = s3.Object(s3_path, metadata_file_name).get()['Body'].read().decode("utf-8")
-        metadata = json.loads(metadata) 
+        metadata = json.loads(metadata)
 
         result = BackupMetadata()
         result.type = metadata.get("type", "None")
@@ -67,6 +67,7 @@ class BackupCollector:
         result.count_of_backups = metadata.get("count_of_backups", "None")
         result.last_backup_date = metadata.get("last_backup_date", "None")
         result.supposed_backups_count = metadata.get("supposed_backups_count", "None")
+        result.sha1sum = metadata.get("sha1sum", "None")
 
         logging.info(f"Collect metadata from {s3_path} complete")
         return result
@@ -80,20 +81,20 @@ class BackupCollector:
     def _compile_csv(self, metadata: list) -> str:
         logging.info(f"Compile csv file")
         csv_path = "tmp_report.csv"
-        self._csv_write([[ "Customer", "DB type", "Backup Placement", "Size in MB", "Backup time spent", "Backup name", "Backups count", "Supposed Backups Count", "Last Backup Date", "Description" ]], csv_path)
+        self._csv_write([[ "Customer", "DB type", "Backup Placement", "Size in MB", "Backup time spent", "Backup name", "Backup sha1 hash sum", "Backups count", "Supposed Backups Count", "Last Backup Date", "Description" ]], csv_path)
 
         backups_info = []
         for data in metadata:
-            row = [ data.customer, data.type, data.placement, data.size, data.time, data.backup_name, data.count_of_backups, data.supposed_backups_count, data.last_backup_date, data.description ]
+            row = [ data.customer, data.type, data.placement, data.size, data.time, data.backup_name, data.sha1sum, data.count_of_backups, data.supposed_backups_count, data.last_backup_date, data.description ]
             backups_info.append(row)
-        
+
         self._csv_write(backups_info, csv_path)
 
         return csv_path
 
     def _upload_csv(self, csv_path: str) -> None:
         logging.info(f"Upload csv to google sheet")
-        scope = ["https://spreadsheets.google.com/feeds", 
+        scope = ["https://spreadsheets.google.com/feeds",
             "https://www.googleapis.com/auth/spreadsheets",
             "https://www.googleapis.com/auth/drive.file",
             "https://www.googleapis.com/auth/drive"]
@@ -118,7 +119,7 @@ class BackupCollector:
             spreadsheet.worksheet(self.worksheet_name)
         except gspread.exceptions.WorksheetNotFound as e:
             spreadsheet.add_worksheet(title=self.worksheet_name, rows="100", cols="20")
-        
+
         spreadsheet.values_clear(self.worksheet_name + "!A1:L10000")
         spreadsheet.values_update(
             self.worksheet_name,
@@ -179,6 +180,7 @@ class BackupCollector:
                 self.color_neutral, # Size in MB
                 self.color_neutral, # Backup time spent
                 self.color_neutral, # Backup name
+                self.color_neutral, # Backup hash sum
                 self._color_backup_count(data), # Backup count
                 self._color_supposed_backups_count(data), # Supposed Backups Count
                 self._color_last_backup_date(data) , # Last Backup Date
@@ -186,7 +188,7 @@ class BackupCollector:
             ])
 
         return result
-    
+
     def _get_column_name(self, n):
         '''
             Get letter from english alphabet by position number
@@ -201,7 +203,7 @@ class BackupCollector:
             n = (n - 1) // 26
 
         return result[::-1]
-    
+
     def _colorize_worksheet(self, color_matrix: list) -> None:
         '''
             Colorize spreadsheet with colors sets in color_matrix
@@ -210,12 +212,12 @@ class BackupCollector:
         credentials = ServiceAccountCredentials.from_json_keyfile_name(self.credentials_path, scope)
         spreadsheet = gspread.authorize(credentials).open(self.spreadsheet_name)
         worksheet = spreadsheet.worksheet(self.worksheet_name)
-        
+
         # Drop all worksheet colors
         format_cell_range(
-            worksheet=worksheet, 
+            worksheet=worksheet,
             name="0", # Set all cells for that operation
-            cell_format=CellFormat(backgroundColor=Color(1, 1, 1)) # Colorize cells to white 
+            cell_format=CellFormat(backgroundColor=Color(1, 1, 1)) # Colorize cells to white
         )
 
         # Iterate over color_matrix like over worksheet rows and its numbers
@@ -224,7 +226,7 @@ class BackupCollector:
             # Iterate over worksheet cells in row and its column numbers
             for x, col in enumerate(row):
                 format_cell_range(
-                    worksheet=worksheet, 
+                    worksheet=worksheet,
                     name=self._get_column_name(x+1)+str(y+1), # Compile cell name in format like "A1", "B2" etc
                     cell_format=CellFormat(backgroundColor=col)
                 )
