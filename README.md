@@ -87,6 +87,37 @@ that by write `pendingowner:me` in his google drive, find according spreadsheet
 and get the ownership. One can read some details at
 https://support.google.com/docs/answer/2494892?hl=en&co=GENIE.Platform%3DDesktop.
 
+### Spreadsheet Ownership Transfer
+
+Transferring ownership of a Google Spreadsheet is a two-step process:
+
+1. **Initiation**
+   The collector marks the spreadsheet with a flag indicating that ownership needs to be transferred.
+
+2. **Acceptance**
+   The intended new owner must manually accept ownership by:
+   - Opening [Google Drive](https://drive.google.com)
+   - Searching for `pendingowner:me`
+   - Locating the corresponding spreadsheet
+   - Accepting the ownership transfer
+
+> **More information:**
+> [Google Docs Help: Transfer ownership of a file](https://support.google.com/docs/answer/2494892?hl=en&co=GENIE.Platform%3DDesktop)
+
+---
+
+### Alternative: Share Spreadsheet with Service Account (No Ownership Transfer)
+
+Instead of transferring ownership, you can create the spreadsheet manually and **share it with the service account**.
+
+- **Note:** Ownership remains with you — the service account is only granted access.
+- **Required permissions:** `Editor`
+- **Service account email:** Found in the JSON credentials file referenced by the
+  `google_spreadsheet_credentials_path` configuration option.
+
+This method allows the service account to read and update the spreadsheet content,
+but not to manage sharing settings or transfer ownership.
+
 ## Development
 
 Install poetry first, then simply run `poetry install` in repository root - and
