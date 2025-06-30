@@ -78,14 +78,7 @@ bucket:
       customer: Personal
 ```
 
-### Owner transfership at Google Drive
-
-Owner transfership in case of spreadsheets is a two-step process. First,
-collector will set flag on spreadsheet which will indicate that permission have
-to be transferred. After that user which should became an owner has to accept
-that by write `pendingowner:me` in his google drive, find according spreadsheet
-and get the ownership. One can read some details at
-https://support.google.com/docs/answer/2494892?hl=en&co=GENIE.Platform%3DDesktop.
+## Owner transfership at Google Drive
 
 ### Spreadsheet Ownership Transfer
 
