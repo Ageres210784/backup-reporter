@@ -17,6 +17,8 @@ class BackupMetadata:
     count_of_backups: str = None
     supposed_backups_count: str = None
     sha1sum: str = None
+    spreadsheet_name: str = None
+    worksheet_name: str = None
 
     def __str__(self):
         '''String representation of that DataClass is valid json string'''

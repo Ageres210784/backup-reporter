@@ -9,6 +9,7 @@ import dateparser
 from time import sleep
 from gspread_formatting import Color, CellFormat, format_cell_range
 from oauth2client.service_account import ServiceAccountCredentials
+from collections import defaultdict
 
 from backup_reporter.dataclass import BackupMetadata
 
@@ -16,13 +17,9 @@ from backup_reporter.dataclass import BackupMetadata
 class BackupCollector:
     def __init__(self, buckets: list,
             google_spreadsheet_credentials_path: str,
-            spreadsheet_name: str,
-            worksheet_name: str,
             sheet_owner: str) -> None:
         self.buckets = buckets
         self.credentials_path = google_spreadsheet_credentials_path
-        self.spreadsheet_name = spreadsheet_name
-        self.worksheet_name = worksheet_name
         self.sheet_owner = sheet_owner
 
         self.color_neutral = Color(1,1,1) # White
@@ -68,8 +65,28 @@ class BackupCollector:
         result.last_backup_date = metadata.get("last_backup_date", "None")
         result.supposed_backups_count = metadata.get("supposed_backups_count", "None")
         result.sha1sum = metadata.get("sha1sum", "None")
+        result.spreadsheet_name = metadata.get("spreadsheet_name", "None")
+        result.worksheet_name = metadata.get("worksheet_name", "None")
 
         logging.info(f"Collect metadata from {s3_path} complete")
+        return result
+
+    def _group_metadata(self, metadata: list) -> list:
+        grouped = defaultdict(list)
+        for item in metadata:
+            key = (item.spreadsheet_name, item.worksheet_name)
+            grouped[key].append(item)
+
+        result = []
+        for i, ((spreadsheet_name, worksheet_name), group) in enumerate(grouped.items()):
+            csv_path = f"tmp_report_{i}.csv"
+            result.append({
+                "spreadsheet_name": spreadsheet_name,
+                "worksheet_name": worksheet_name,
+                "metadata": group,
+                "csv_path": csv_path
+            })
+
         return result
 
     def _csv_write(self, data: list, csv_path: str) -> None:
@@ -78,9 +95,8 @@ class BackupCollector:
             for row in data:
                 csv_file.writerow(row)
 
-    def _compile_csv(self, metadata: list) -> str:
+    def _compile_csv(self, metadata: list, csv_path: str = "tmp_report.csv") -> None:
         logging.info(f"Compile csv file")
-        csv_path = "tmp_report.csv"
         self._csv_write([[ "Customer", "DB type", "Backup Placement", "Size in MB", "Backup time spent", "Backup name", "Backup sha1 hash sum", "Backups count", "Supposed Backups Count", "Last Backup Date", "Description" ]], csv_path)
 
         backups_info = []
@@ -90,9 +106,7 @@ class BackupCollector:
 
         self._csv_write(backups_info, csv_path)
 
-        return csv_path
-
-    def _upload_csv(self, csv_path: str) -> None:
+    def _upload_csv(self, csv_path: str, spreadsheet_name: str, worksheet_name: str) -> None:
         logging.info(f"Upload csv to google sheet")
         scope = ["https://spreadsheets.google.com/feeds",
             "https://www.googleapis.com/auth/spreadsheets",
@@ -101,7 +115,7 @@ class BackupCollector:
         credentials = ServiceAccountCredentials.from_json_keyfile_name(self.credentials_path, scope)
         client = gspread.authorize(credentials)
         try:
-            spreadsheet = client.open(self.spreadsheet_name)
+            spreadsheet = client.open(spreadsheet_name)
             logging.debug("List current permissions")
             permissions = spreadsheet.list_permissions()
             logging.debug(permissions)
@@ -111,18 +125,18 @@ class BackupCollector:
                     spreadsheet.transfer_ownership(user["id"])
                     break
         except gspread.exceptions.SpreadsheetNotFound as e:
-            spreadsheet = client.create(self.spreadsheet_name)
+            spreadsheet = client.create(spreadsheet_name)
             spreadsheet.share(self.sheet_owner, perm_type='user', role='writer')
 
         try:
             logging.debug(f"Worksheets are: {spreadsheet.worksheets()}")
-            spreadsheet.worksheet(self.worksheet_name)
+            spreadsheet.worksheet(worksheet_name)
         except gspread.exceptions.WorksheetNotFound as e:
-            spreadsheet.add_worksheet(title=self.worksheet_name, rows="100", cols="20")
+            spreadsheet.add_worksheet(title=worksheet_name, rows="100", cols="20")
 
-        spreadsheet.values_clear(self.worksheet_name + "!A1:L10000")
+        spreadsheet.values_clear(worksheet_name + "!A1:L10000")
         spreadsheet.values_update(
-            self.worksheet_name,
+            worksheet_name,
             params={'valueInputOption': 'USER_ENTERED'},
             body={'values': list(csv.reader(open(csv_path)))}
         )
@@ -204,14 +218,14 @@ class BackupCollector:
 
         return result[::-1]
 
-    def _colorize_worksheet(self, color_matrix: list) -> None:
+    def _colorize_worksheet(self, color_matrix: list, spreadsheet_name: str, worksheet_name: str) -> None:
         '''
             Colorize spreadsheet with colors sets in color_matrix
         '''
         scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/spreadsheets', "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
         credentials = ServiceAccountCredentials.from_json_keyfile_name(self.credentials_path, scope)
-        spreadsheet = gspread.authorize(credentials).open(self.spreadsheet_name)
-        worksheet = spreadsheet.worksheet(self.worksheet_name)
+        spreadsheet = gspread.authorize(credentials).open(spreadsheet_name)
+        worksheet = spreadsheet.worksheet(worksheet_name)
 
         # Drop all worksheet colors
         format_cell_range(
@@ -244,9 +258,12 @@ class BackupCollector:
                 )
             )
 
-        csv = self._compile_csv(metadata)
-        self._upload_csv(csv)
-        os.remove(csv)
+        groups = self._group_metadata(metadata)
 
-        color_matrix = self._set_color_matrix(metadata)
-        self._colorize_worksheet(color_matrix)
+        for group in groups:
+            self._compile_csv(group["metadata"], group["csv_path"])
+            self._upload_csv(group["csv_path"], group["spreadsheet_name"], group["worksheet_name"])
+            os.remove(group["csv_path"])
+
+            color_matrix = self._set_color_matrix(group["metadata"])
+            self._colorize_worksheet(color_matrix, group["spreadsheet_name"], group["worksheet_name"])

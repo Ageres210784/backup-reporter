@@ -28,8 +28,6 @@ def start():
         logging.info("Run collector")
         collector = BackupCollector(buckets = confs.get('bucket', None),
             google_spreadsheet_credentials_path = confs.get('google_spreadsheet_credentials_path', None),
-            spreadsheet_name = confs.get('spreadsheet_name', None),
-            worksheet_name = confs.get('worksheet_name', None),
             sheet_owner = confs.get('sheet_owner', None))
         collector.collect()
 
@@ -44,6 +42,8 @@ def start():
             customer = confs.get("customer", None),
             supposed_backups_count = confs.get("supposed_backups_count", None),
             aws_endpoint_url = confs["bucket"][0].get("aws_endpoint_url", None),
+            spreadsheet_name = confs.get('spreadsheet_name', None),
+            worksheet_name = confs.get('worksheet_name', None),
             description = confs.get("description", None)
         )
         reporter.report()
@@ -58,6 +58,8 @@ def start():
             customer = confs.get("customer", None),
             supposed_backups_count = confs.get("supposed_backups_count", None),
             aws_endpoint_url = confs["bucket"][0].get("aws_endpoint_url", None),
+            spreadsheet_name = confs.get('spreadsheet_name', None),
+            worksheet_name = confs.get('worksheet_name', None),
             description = confs.get("description", None),
             files_mask = confs.get("files_mask", None)
         )
@@ -73,6 +75,8 @@ def start():
             customer = confs.get("customer", None),
             supposed_backups_count = confs.get("supposed_backups_count", None),
             aws_endpoint_url = confs["bucket"][0].get("aws_endpoint_url", None),
+            spreadsheet_name = confs.get('spreadsheet_name', None),
+            worksheet_name = confs.get('worksheet_name', None),
             description = confs.get("description", None),
             files_mask = confs.get("files_mask", None),
             backups_dir = confs.get("backups_dir", None)
@@ -89,7 +93,9 @@ def start():
             customer = confs.get("customer", None),
             supposed_backups_count = confs.get("supposed_backups_count", None),
             aws_endpoint_url = confs["bucket"][0].get("aws_endpoint_url", None),
-            description = confs.get("description", None),
+            spreadsheet_name = confs.get('spreadsheet_name', None),
+            worksheet_name = confs.get('worksheet_name', None),
+            description = confs.get("description", None)
         )
         reporter.report()
 

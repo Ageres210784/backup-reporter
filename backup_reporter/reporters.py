@@ -27,6 +27,8 @@ class BackupReporter(ABC):
             customer: str,
             supposed_backups_count: str,
             description: str,
+            spreadsheet_name: str,
+            worksheet_name: str,
             aws_endpoint_url: str = None) -> None:
         self.aws_access_key_id = aws_access_key_id
         self.aws_secret_access_key = aws_secret_access_key
@@ -39,6 +41,8 @@ class BackupReporter(ABC):
         self.metadata.customer = customer
         self.metadata.supposed_backups_count = supposed_backups_count
         self.metadata.description = description
+        self.metadata.spreadsheet_name = spreadsheet_name
+        self.metadata.worksheet_name = worksheet_name
 
     def _gather_metadata(self) -> BackupMetadata:
         '''
@@ -86,6 +90,8 @@ class DockerPostgresBackupReporter(BackupReporter):
             customer: str,
             supposed_backups_count: str,
             description: str,
+            spreadsheet_name: str,
+            worksheet_name: str,
             aws_endpoint_url: str = None) -> None:
 
         super().__init__(
@@ -97,6 +103,8 @@ class DockerPostgresBackupReporter(BackupReporter):
             supposed_backups_count = supposed_backups_count,
             type = "DockerPostgres",
             description = description,
+            spreadsheet_name = spreadsheet_name,
+            worksheet_name = worksheet_name,
             aws_endpoint_url = aws_endpoint_url)
 
         self.container_name = container_name
@@ -157,6 +165,8 @@ class FilesBucketReporterBackupReporter(BackupReporter):
             customer: str,
             supposed_backups_count: str,
             description: str,
+            spreadsheet_name: str,
+            worksheet_name: str,
             files_mask: str,
             aws_endpoint_url: str = None) -> None:
 
@@ -169,6 +179,8 @@ class FilesBucketReporterBackupReporter(BackupReporter):
             supposed_backups_count = supposed_backups_count,
             type = "FilesBucket",
             description = description,
+            spreadsheet_name = spreadsheet_name,
+            worksheet_name = worksheet_name,
             aws_endpoint_url = aws_endpoint_url)
 
         self.metadata.last_backup_date = None
@@ -225,6 +237,8 @@ class FilesReporterBackupReporter(BackupReporter):
             description: str,
             files_mask: str,
             backups_dir: str,
+            spreadsheet_name: str,
+            worksheet_name: str,
             aws_endpoint_url: str = None) -> None:
 
         super().__init__(
@@ -236,6 +250,8 @@ class FilesReporterBackupReporter(BackupReporter):
             supposed_backups_count = supposed_backups_count,
             type = "Files",
             description = description,
+            spreadsheet_name = spreadsheet_name,
+            worksheet_name = worksheet_name,
             aws_endpoint_url = aws_endpoint_url)
 
         self.files_mask = files_mask
@@ -295,6 +311,8 @@ class S3MariadbBackupReporter(BackupReporter):
             customer: str,
             supposed_backups_count: str,
             description: str,
+            spreadsheet_name: str,
+            worksheet_name: str,
             aws_endpoint_url: str = None) -> None:
 
         super().__init__(
@@ -306,6 +324,8 @@ class S3MariadbBackupReporter(BackupReporter):
             supposed_backups_count = supposed_backups_count,
             type = "DockerMariadb",
             description = description,
+            spreadsheet_name = spreadsheet_name,
+            worksheet_name = worksheet_name,
             aws_endpoint_url = aws_endpoint_url)
 
         self.metadata.last_backup_date = None
