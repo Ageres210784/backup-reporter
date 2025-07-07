@@ -101,13 +101,13 @@ class BackupCollector:
     def _compile_file_backups_csv(self, metadata: list) -> str:
         logging.info(f"Compile csv file")
         csv_path = "tmp_report_file_backups.csv"
-        self._csv_write([[ "Backup name", "Backup sha1 hash sum", "Size in MB", "Backup Date" ]], csv_path)
+        self._csv_write([[ "Customer", "Backup name", "Backup sha1 hash sum", "Size in MB", "Backup Date" ]], csv_path)
 
         backups_info = []
         for data in metadata:
             if data.backups:
                 for backup_file in data.backups:
-                    row = [ backup_file.backup_name, backup_file.sha1sum, backup_file.size, backup_file.backup_date ]
+                    row = [ data.customer, backup_file.backup_name, backup_file.sha1sum, backup_file.size, backup_file.backup_date ]
                     backups_info.append(row)
 
         self._csv_write(backups_info, csv_path)
