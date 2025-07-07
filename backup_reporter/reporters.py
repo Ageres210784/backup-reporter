@@ -112,6 +112,7 @@ class DockerPostgresBackupReporter(BackupReporter):
         incremental_backup_count = 0
         for backup in wal_show[0]['backups']:
             backup_time = datetime.strptime(backup.get('time'), '%Y-%m-%dT%H:%M:%SZ')
+            backup_time = backup_time.replace(tzinfo=pytz.UTC, microsecond=0)
             if not self.metadata.last_backup_date or backup_time > self.metadata.last_backup_date:
                 self.metadata.last_backup_date = backup_time  # Beware, this is ALWAYS about LAST backup - full or incremental
                 self.metadata.backup_name = backup.get("backup_name", "None")  # Also ALWAYS about LAST backup
@@ -277,16 +278,6 @@ class FilesReporterBackupReporter(BackupReporter):
                         backup_name=filename,
                         sha1sum=sha1sum
                     ))
-
-        # if latest_backup["key"]: # If at least one file exists
-        #     sha1 = hashlib.sha1()
-        #     try:
-        #         with open(latest_backup["key"], "rb") as f:
-        #             while chunk := f.read(8192):
-        #                 sha1.update(chunk)
-        #         self.metadata.sha1sum = sha1.hexdigest()
-        #     except Exception as e:
-        #         logging.error(f"Can not read the file!")
 
         if latest_backup["key"]: # If at least one file exists
             self.metadata.count_of_backups = count_of_backups
