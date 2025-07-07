@@ -10,7 +10,7 @@ from time import sleep
 from gspread_formatting import Color, CellFormat, format_cell_range
 from oauth2client.service_account import ServiceAccountCredentials
 
-from backup_reporter.dataclass import BackupMetadata
+from backup_reporter.dataclass import BackupMetadata, BackupFileInfo
 
 
 class BackupCollector:
@@ -68,7 +68,13 @@ class BackupCollector:
         result.last_backup_date = metadata.get("last_backup_date", "None")
         result.supposed_backups_count = metadata.get("supposed_backups_count", "None")
         result.sha1sum = metadata.get("sha1sum", "None")
-
+        for item in metadata.get("backups", []):
+            result.backups.append(BackupFileInfo(
+                backup_name=item.get("backup_name", "None"),
+                size=item.get("size", "None"),
+                backup_date=item.get("backup_date", "None"),
+                sha1sum=item.get("sha1sum", "None")
+            ))
         logging.info(f"Collect metadata from {s3_path} complete")
         return result
 
@@ -92,7 +98,23 @@ class BackupCollector:
 
         return csv_path
 
-    def _upload_csv(self, csv_path: str) -> None:
+    def _compile_file_backups_csv(self, metadata: list) -> str:
+        logging.info(f"Compile csv file")
+        csv_path = "tmp_report_file_backups.csv"
+        self._csv_write([[ "Customer", "Backup name", "Backup sha1 hash sum", "Size in MB", "Backup Date" ]], csv_path)
+
+        backups_info = []
+        for data in metadata:
+            if data.backups:
+                for backup_file in data.backups:
+                    row = [ data.customer, backup_file.backup_name, backup_file.sha1sum, backup_file.size, backup_file.backup_date ]
+                    backups_info.append(row)
+
+        self._csv_write(backups_info, csv_path)
+
+        return csv_path
+
+    def _upload_csv(self, csv_path: str, worksheet_name: str) -> None:
         logging.info(f"Upload csv to google sheet")
         scope = ["https://spreadsheets.google.com/feeds",
             "https://www.googleapis.com/auth/spreadsheets",
@@ -116,13 +138,13 @@ class BackupCollector:
 
         try:
             logging.debug(f"Worksheets are: {spreadsheet.worksheets()}")
-            spreadsheet.worksheet(self.worksheet_name)
+            spreadsheet.worksheet(worksheet_name)
         except gspread.exceptions.WorksheetNotFound as e:
-            spreadsheet.add_worksheet(title=self.worksheet_name, rows="100", cols="20")
+            spreadsheet.add_worksheet(title=worksheet_name, rows="100", cols="20")
 
-        spreadsheet.values_clear(self.worksheet_name + "!A1:L10000")
+        spreadsheet.values_clear(worksheet_name + "!A1:L10000")
         spreadsheet.values_update(
-            self.worksheet_name,
+            worksheet_name,
             params={'valueInputOption': 'USER_ENTERED'},
             body={'values': list(csv.reader(open(csv_path)))}
         )
@@ -245,8 +267,11 @@ class BackupCollector:
             )
 
         csv = self._compile_csv(metadata)
-        self._upload_csv(csv)
+        file_backups_csv = self._compile_file_backups_csv(metadata)
+        self._upload_csv(csv, self.worksheet_name)
+        self._upload_csv(file_backups_csv, self.worksheet_name + '_files')
         os.remove(csv)
+        os.remove(file_backups_csv)
 
         color_matrix = self._set_color_matrix(metadata)
         self._colorize_worksheet(color_matrix)

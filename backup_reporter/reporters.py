@@ -7,7 +7,7 @@ import hashlib
 
 from abc import ABC
 from datetime import datetime
-from backup_reporter.dataclass import BackupMetadata
+from backup_reporter.dataclass import BackupMetadata, BackupFileInfo
 from backup_reporter.utils import exec_cmd
 from fnmatch import fnmatch
 
@@ -112,6 +112,7 @@ class DockerPostgresBackupReporter(BackupReporter):
         incremental_backup_count = 0
         for backup in wal_show[0]['backups']:
             backup_time = datetime.strptime(backup.get('time'), '%Y-%m-%dT%H:%M:%SZ')
+            backup_time = backup_time.replace(tzinfo=pytz.UTC, microsecond=0)
             if not self.metadata.last_backup_date or backup_time > self.metadata.last_backup_date:
                 self.metadata.last_backup_date = backup_time  # Beware, this is ALWAYS about LAST backup - full or incremental
                 self.metadata.backup_name = backup.get("backup_name", "None")  # Also ALWAYS about LAST backup
@@ -257,26 +258,35 @@ class FilesReporterBackupReporter(BackupReporter):
                         stat = os.stat(filepath)
                     except FileNotFoundError:
                         continue
+
+                    sha1 = hashlib.sha1()
+                    try:
+                        with open(filepath, "rb") as f:
+                            while chunk := f.read(8192):
+                                sha1.update(chunk)
+                        sha1sum = sha1.hexdigest()
+                    except Exception as e:
+                        logging.error(f"Can not read the file!")
+
                     mtime = datetime.fromtimestamp(stat.st_mtime, tz=pytz.UTC).replace(microsecond=0)
                     if mtime > latest_backup["last_modified"]:
-                        latest_backup = {"key": filepath, "last_modified": mtime, "size": stat.st_size}
+                        latest_backup = {"key": filename, "last_modified": mtime, "size": stat.st_size, "sha1sum": sha1sum}
+
+                    self.metadata.backups.append(BackupFileInfo(
+                        size=round(stat.st_size/1024/1024, 1),
+                        backup_date=mtime,
+                        backup_name=filename,
+                        sha1sum=sha1sum
+                    ))
 
         if latest_backup["key"]: # If at least one file exists
-            sha1 = hashlib.sha1()
-            try:
-                with open(latest_backup["key"], "rb") as f:
-                    while chunk := f.read(8192):
-                        sha1.update(chunk)
-                self.metadata.sha1sum = sha1.hexdigest()
-            except Exception as e:
-                logging.error(f"Can not read the file!")
-
-        self.metadata.count_of_backups = count_of_backups
-        self.metadata.last_backup_date = latest_backup["last_modified"]
-        self.metadata.backup_name = os.path.basename(latest_backup["key"])
-        self.metadata.placement = self.backups_dir
-        self.metadata.size = round(latest_backup["size"]/1024/1024, 1)
-        self.metadata.time = 0
+            self.metadata.count_of_backups = count_of_backups
+            self.metadata.last_backup_date = latest_backup["last_modified"]
+            self.metadata.backup_name = latest_backup["key"]
+            self.metadata.placement = self.backups_dir
+            self.metadata.size = round(latest_backup["size"]/1024/1024, 1)
+            self.metadata.time = 0
+            self.metadata.sha1sum = latest_backup["sha1sum"]
 
         logging.info("Gather metadata success")
         logging.debug(self.metadata)
