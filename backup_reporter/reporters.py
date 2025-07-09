@@ -200,6 +200,11 @@ class FilesBucketReporterBackupReporter(BackupReporter):
             if fnmatch(object.key, self.files_mask): # Check if object name matches with files mask from config file
                 if latest_backup["last_modified"] < object.last_modified:
                     latest_backup = {"key": object.key, "last_modified": object.last_modified, "size": object.size}
+                self.metadata.backups.append(BackupFileInfo(
+                    size=round(object.size/1024/1024, 1),
+                    backup_date=object.last_modified,
+                    backup_name=object.key
+                ))
                 count_of_backups += 1
 
         self.metadata.count_of_backups = count_of_backups
