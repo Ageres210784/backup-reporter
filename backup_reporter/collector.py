@@ -101,13 +101,13 @@ class BackupCollector:
     def _compile_file_backups_csv(self, metadata: list) -> str:
         logging.info(f"Compile csv file")
         csv_path = "tmp_report_file_backups.csv"
-        self._csv_write([[ "Customer", "Backup name", "Backup sha1 hash sum", "Size in MB", "Backup Date" ]], csv_path)
+        self._csv_write([[ "Customer", "Description", "Backup name", "Backup sha1 hash sum", "Size in MB", "Backup Date" ]], csv_path)
 
         backups_info = []
         for data in metadata:
             if data.backups:
                 for backup_file in data.backups:
-                    row = [ data.customer, backup_file.backup_name, backup_file.sha1sum, backup_file.size, backup_file.backup_date ]
+                    row = [ data.customer, data.description, backup_file.backup_name, backup_file.sha1sum, backup_file.size, backup_file.backup_date ]
                     backups_info.append(row)
 
         self._csv_write(backups_info, csv_path)
@@ -244,9 +244,11 @@ class BackupCollector:
 
         # Iterate over color_matrix like over worksheet rows and its numbers
         for y, row in enumerate(color_matrix):
-            sleep(5)
             # Iterate over worksheet cells in row and its column numbers
             for x, col in enumerate(row):
+                if col == self.color_neutral: # Check if cell is white
+                    continue
+                sleep(5)
                 format_cell_range(
                     worksheet=worksheet,
                     name=self._get_column_name(x+1)+str(y+1), # Compile cell name in format like "A1", "B2" etc
