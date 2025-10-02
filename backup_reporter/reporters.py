@@ -1,12 +1,15 @@
-import boto3
-import json
-import logging
-import pytz
 import os
+import pytz
+import json
+import boto3
+import logging
 import hashlib
 
 from abc import ABC
+from pathlib import Path
+from urllib import urlparse
 from datetime import datetime
+
 from backup_reporter.dataclass import BackupMetadata, BackupFileInfo
 from backup_reporter.utils import exec_cmd
 from fnmatch import fnmatch
@@ -27,12 +30,16 @@ class BackupReporter(ABC):
             customer: str,
             supposed_backups_count: str,
             description: str,
-            aws_endpoint_url: str = None) -> None:
+            aws_endpoint_url: str = None,
+            destination_type: str = "s3",
+            upload_path: Path = None) -> None:
         self.aws_access_key_id = aws_access_key_id
         self.aws_secret_access_key = aws_secret_access_key
         self.aws_region = aws_region
         self.aws_endpoint_url = aws_endpoint_url
         self.s3_path = s3_path
+        self.destination_type = destination_type
+        self.upload_path = upload_path
 
         self.metadata = BackupMetadata()
         self.metadata.type = type
@@ -49,20 +56,33 @@ class BackupReporter(ABC):
 
     def _upload_metadata(self, metadata: BackupMetadata) -> None:
         '''Upload metadata file to place, where backups stored'''
-        logging.info(f"Uploud metadata to {self.s3_path} ...")
-        kwargs = {
-           "aws_access_key_id": self.aws_access_key_id,
-           "aws_secret_access_key": self.aws_secret_access_key,
-           "region_name": self.aws_region,
-           "endpoint_url": self.aws_endpoint_url
-        }
-        s3 = boto3.resource(
-            's3',
-            **{k:v for k,v in kwargs.items() if v is not None}
-        )
-        metadata_file_name = "/".join(self.s3_path.split("/")[3:])
-        s3_path = self.s3_path.split("/")[2]
-        s3.Object(s3_path, metadata_file_name).put(Body=str(metadata))
+
+        if self.destination_type == "s3":
+            logging.info(f"Uploud metadata to {self.s3_path} ...")
+            kwargs = {
+                "aws_access_key_id": self.aws_access_key_id,
+                "aws_secret_access_key": self.aws_secret_access_key,
+                "region_name": self.aws_region,
+                "endpoint_url": self.aws_endpoint_url
+            }
+            s3 = boto3.resource(
+                's3',
+                **{k:v for k,v in kwargs.items() if v is not None}
+            )
+            metadata_file_name = "/".join(self.s3_path.split("/")[3:])
+            s3_path = self.s3_path.split("/")[2]
+            s3.Object(s3_path, metadata_file_name).put(Body=str(metadata))
+
+        elif self.destination_type == "host":
+            metadata_dir = self.upload_path.parents[0]
+            if not metadata_dir.is_dir():
+                try:
+                    metadata_dir.mkdir(parents=True, exist_ok=True)
+                except Exception as e:
+                    raise e
+            with open(self.upload_path):
+                json.dump(self.metadata)
+
         logging.info(f"Uploud metadata success")
 
     def report(self) -> None:
@@ -159,7 +179,9 @@ class FilesBucketReporterBackupReporter(BackupReporter):
             supposed_backups_count: str,
             description: str,
             files_mask: str,
-            aws_endpoint_url: str = None) -> None:
+            aws_endpoint_url: str = None,
+            destination_type: str = "s3",
+            upload_path: Path = None) -> None:
 
         super().__init__(
             aws_access_key_id = aws_access_key_id,
@@ -170,7 +192,9 @@ class FilesBucketReporterBackupReporter(BackupReporter):
             supposed_backups_count = supposed_backups_count,
             type = "FilesBucket",
             description = description,
-            aws_endpoint_url = aws_endpoint_url)
+            aws_endpoint_url = aws_endpoint_url,
+            destination_type = destination_type,
+            upload_path = upload_path)
 
         self.metadata.last_backup_date = None
         self.files_mask = files_mask
@@ -190,7 +214,7 @@ class FilesBucketReporterBackupReporter(BackupReporter):
             **{k:v for k,v in kwargs.items() if v is not None}
         )
 
-        bucket_name = self.s3_path.split("/")[2]
+        bucket_name = urlparse(self.s3_path).netloc
         s3 = s3.Bucket(bucket_name)
 
         latest_backup = {"key": None, "last_modified": datetime(2000, 1, 1, tzinfo=pytz.UTC), "size": 0} # Default latest backup
@@ -231,7 +255,9 @@ class FilesReporterBackupReporter(BackupReporter):
             description: str,
             files_mask: str,
             backups_dir: str,
-            aws_endpoint_url: str = None) -> None:
+            aws_endpoint_url: str = None,
+            destination_type: str = "s3",
+            upload_path: Path = None) -> None:
 
         super().__init__(
             aws_access_key_id = aws_access_key_id,
@@ -242,7 +268,9 @@ class FilesReporterBackupReporter(BackupReporter):
             supposed_backups_count = supposed_backups_count,
             type = "Files",
             description = description,
-            aws_endpoint_url = aws_endpoint_url)
+            aws_endpoint_url = aws_endpoint_url,
+            destination_type = destination_type,
+            upload_path = upload_path)
 
         self.files_mask = files_mask
         self.backups_dir = backups_dir
@@ -310,7 +338,9 @@ class S3MariadbBackupReporter(BackupReporter):
             customer: str,
             supposed_backups_count: str,
             description: str,
-            aws_endpoint_url: str = None) -> None:
+            aws_endpoint_url: str = None,
+            destination_type: str = "s3",
+            upload_path: Path = None) -> None:
 
         super().__init__(
             aws_access_key_id = aws_access_key_id,
@@ -321,7 +351,9 @@ class S3MariadbBackupReporter(BackupReporter):
             supposed_backups_count = supposed_backups_count,
             type = "DockerMariadb",
             description = description,
-            aws_endpoint_url = aws_endpoint_url)
+            aws_endpoint_url = aws_endpoint_url,
+            destination_type = destination_type,
+            upload_path = upload_path)
 
         self.metadata.last_backup_date = None
 
