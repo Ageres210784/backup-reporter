@@ -8,11 +8,11 @@ import hashlib
 from abc import ABC
 from pathlib import Path
 from urllib import urlparse
+from fnmatch import fnmatch
 from datetime import datetime
 
-from backup_reporter.dataclass import BackupMetadata, BackupFileInfo
 from backup_reporter.utils import exec_cmd
-from fnmatch import fnmatch
+from backup_reporter.dataclass import BackupMetadata, BackupFileInfo
 
 
 class BackupReporter(ABC):
