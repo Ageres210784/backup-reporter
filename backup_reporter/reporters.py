@@ -78,6 +78,7 @@ class BackupReporter(ABC):
             s3.Object(bucket_name, metadata_file_name).put(Body=str(metadata), ContentType=content_type)
 
         elif self.destination_type == "host":
+            logging.info(f"Upload metadata on host to {self.upload_path} ...")
             metadata_dir = self.upload_path.parents[0]
             if not metadata_dir.is_dir():
                 try:
