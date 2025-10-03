@@ -24,11 +24,6 @@ def start():
         level=getattr(logging, confs.get("logging_level", "INFO")),
         handlers=[logging.StreamHandler(sys.stdout)]
     )
-    upload_path = None
-    if (confs["bucket"] is not None) and (upload_path is None):
-        upload_path = confs["bucket"][0].get("s3_path", None)
-    if (confs["destination"] is not None) and (upload_path is None):
-        upload_path = confs["destination"][0].get("path", None)
 
     if confs["collector"]:
         logging.info("Run collector")
@@ -45,13 +40,14 @@ def start():
             aws_access_key_id = confs["bucket"][0].get("aws_access_key_id", None),
             aws_secret_access_key = confs["bucket"][0].get("aws_secret_access_key", None),
             aws_region = confs["bucket"][0].get("aws_region", None),
+            s3_path = confs["bucket"][0].get("s3_path", None),
             container_name = confs.get("container_name", None),
             customer = confs.get("customer", None),
             supposed_backups_count = confs.get("supposed_backups_count", None),
             aws_endpoint_url = confs["bucket"][0].get("aws_endpoint_url", None),
             description = confs.get("description", None),
             destination_type = confs["destination"][0].get("type", "s3"),
-            upload_path = upload_path
+            upload_path = confs["destination"][0].get("path", None)
         )
         reporter.report()
 
@@ -61,13 +57,14 @@ def start():
             aws_access_key_id = confs["bucket"][0].get("aws_access_key_id", None),
             aws_secret_access_key = confs["bucket"][0].get("aws_secret_access_key", None),
             aws_region = confs["bucket"][0].get("aws_region", None),
+            s3_path = confs["bucket"][0].get("s3_path", None),
             customer = confs.get("customer", None),
             supposed_backups_count = confs.get("supposed_backups_count", None),
             aws_endpoint_url = confs["bucket"][0].get("aws_endpoint_url", None),
             description = confs.get("description", None),
             files_mask = confs.get("files_mask", None),
             destination_type = confs["destination"][0].get("type", "s3"),
-            upload_path = upload_path
+            upload_path = confs["destination"][0].get("path", None)
         )
         reporter.report()
 
@@ -77,6 +74,7 @@ def start():
             aws_access_key_id = confs["bucket"][0].get("aws_access_key_id", None),
             aws_secret_access_key = confs["bucket"][0].get("aws_secret_access_key", None),
             aws_region = confs["bucket"][0].get("aws_region", None),
+            s3_path = confs["bucket"][0].get("s3_path", None),
             customer = confs.get("customer", None),
             supposed_backups_count = confs.get("supposed_backups_count", None),
             aws_endpoint_url = confs["bucket"][0].get("aws_endpoint_url", None),
@@ -84,7 +82,7 @@ def start():
             files_mask = confs.get("files_mask", None),
             backups_dir = confs.get("backups_dir", None),
             destination_type = confs["destination"][0].get("type", "s3"),
-            upload_path = upload_path
+            upload_path = confs["destination"][0].get("path", None)
         )
         reporter.report()
 
@@ -94,12 +92,13 @@ def start():
             aws_access_key_id = confs["bucket"][0].get("aws_access_key_id", None),
             aws_secret_access_key = confs["bucket"][0].get("aws_secret_access_key", None),
             aws_region = confs["bucket"][0].get("aws_region", None),
+            s3_path = confs["bucket"][0].get("s3_path", None),
             customer = confs.get("customer", None),
             supposed_backups_count = confs.get("supposed_backups_count", None),
             aws_endpoint_url = confs["bucket"][0].get("aws_endpoint_url", None),
             description = confs.get("description", None),
             destination_type = confs["destination"][0].get("type", "s3"),
-            upload_path = upload_path
+            upload_path = confs["destination"][0].get("path", None)
         )
         reporter.report()
 
