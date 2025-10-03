@@ -7,9 +7,9 @@ import hashlib
 
 from abc import ABC
 from pathlib import Path
-from urllib.parse import urlparse
 from fnmatch import fnmatch
 from datetime import datetime
+from urllib.parse import urlparse
 
 from backup_reporter.utils import exec_cmd
 from backup_reporter.dataclass import BackupMetadata, BackupFileInfo
@@ -165,7 +165,11 @@ class DockerPostgresBackupReporter(BackupReporter):
         
         bucket_name = urlparse(self.s3_path).netloc
         self.metadata.placement = bucket_name
-        self.metadata.format = self.s3_path.split('.')[-1]
+
+        if self.upload_path:
+            self.metadata.format = self.upload_path.split('.')[-1]
+        elif self.s3_path:
+            self.metadata.format = self.s3_path.split('.')[-1]
 
         logging.info("Gather metadata success")
         logging.debug(self.metadata)
@@ -246,7 +250,11 @@ class FilesBucketReporterBackupReporter(BackupReporter):
         self.metadata.placement = bucket_name
         self.metadata.size = round(latest_backup["size"]/1024/1024, 1)
         self.metadata.time = 0
-        self.metadata.format = self.s3_path.split('.')[-1]
+
+        if self.upload_path:
+            self.metadata.format = self.upload_path.split('.')[-1]
+        elif self.s3_path:
+            self.metadata.format = self.s3_path.split('.')[-1]
 
         return self.metadata
 
@@ -330,7 +338,10 @@ class FilesReporterBackupReporter(BackupReporter):
             self.metadata.size = round(latest_backup["size"]/1024/1024, 1)
             self.metadata.time = 0
             self.metadata.sha1sum = latest_backup["sha1sum"]
-            self.metadata.format = self.s3_path.split('.')[-1]
+            if self.upload_path:
+                self.metadata.format = self.upload_path.split('.')[-1]
+            elif self.s3_path:
+                self.metadata.format = self.s3_path.split('.')[-1]
 
         logging.info("Gather metadata success")
         logging.debug(self.metadata)
@@ -416,6 +427,9 @@ class S3MariadbBackupReporter(BackupReporter):
         self.metadata.placement = bucket_name
         self.metadata.size = round(backup_total_size/1024/1024, 1)
         self.metadata.time = 0
-        self.metadata.format = self.s3_path.split('.')[-1]
+        if self.upload_path:
+            self.metadata.format = self.upload_path.split('.')[-1]
+        elif self.s3_path:
+            self.metadata.format = self.s3_path.split('.')[-1]
 
         return self.metadata
