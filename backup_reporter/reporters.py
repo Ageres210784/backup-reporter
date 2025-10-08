@@ -1,15 +1,18 @@
-import boto3
-import json
-import logging
-import pytz
 import os
+import pytz
+import json
+import boto3
+import logging
 import hashlib
 
 from abc import ABC
-from datetime import datetime
-from backup_reporter.dataclass import BackupMetadata, BackupFileInfo
-from backup_reporter.utils import exec_cmd
+from pathlib import Path
 from fnmatch import fnmatch
+from datetime import datetime
+from urllib.parse import urlparse
+
+from backup_reporter.utils import exec_cmd
+from backup_reporter.dataclass import BackupMetadata, BackupFileInfo
 
 
 class BackupReporter(ABC):
@@ -27,12 +30,17 @@ class BackupReporter(ABC):
             customer: str,
             supposed_backups_count: str,
             description: str,
-            aws_endpoint_url: str = None) -> None:
+            aws_endpoint_url: str = None,
+            destination_type: str = "s3",
+            upload_path = str) -> None:
+        
         self.aws_access_key_id = aws_access_key_id
         self.aws_secret_access_key = aws_secret_access_key
         self.aws_region = aws_region
         self.aws_endpoint_url = aws_endpoint_url
         self.s3_path = s3_path
+        self.destination_type = destination_type
+        self.upload_path = Path(upload_path)
 
         self.metadata = BackupMetadata()
         self.metadata.type = type
@@ -49,21 +57,39 @@ class BackupReporter(ABC):
 
     def _upload_metadata(self, metadata: BackupMetadata) -> None:
         '''Upload metadata file to place, where backups stored'''
-        logging.info(f"Uploud metadata to {self.s3_path} ...")
-        kwargs = {
-           "aws_access_key_id": self.aws_access_key_id,
-           "aws_secret_access_key": self.aws_secret_access_key,
-           "region_name": self.aws_region,
-           "endpoint_url": self.aws_endpoint_url
-        }
-        s3 = boto3.resource(
-            's3',
-            **{k:v for k,v in kwargs.items() if v is not None}
-        )
-        metadata_file_name = "/".join(self.s3_path.split("/")[3:])
-        s3_path = self.s3_path.split("/")[2]
-        s3.Object(s3_path, metadata_file_name).put(Body=str(metadata))
-        logging.info(f"Uploud metadata success")
+
+        if self.destination_type == "s3":
+            logging.info(f"Upload metadata to {self.s3_path} ...")
+            kwargs = {
+                "aws_access_key_id": self.aws_access_key_id,
+                "aws_secret_access_key": self.aws_secret_access_key,
+                "region_name": self.aws_region,
+                "endpoint_url": self.aws_endpoint_url
+            }
+            s3 = boto3.resource(
+                's3',
+                **{k:v for k,v in kwargs.items() if v is not None}
+            )
+            metadata_file_name = urlparse(self.s3_path).path.lstrip("/")
+            bucket_name = urlparse(self.s3_path).netloc
+
+            content_type = "text/plain; version=0.0.4" if metadata.format == "prom" else "application/json"
+            
+            s3.Object(bucket_name, metadata_file_name).put(Body=str(metadata), ContentType=content_type)
+
+        elif self.destination_type == "host":
+            logging.info(f"Upload metadata on host to {self.upload_path} ...")
+            metadata_dir = self.upload_path.parents[0]
+            if not metadata_dir.is_dir():
+                try:
+                    metadata_dir.mkdir(parents=True, exist_ok=True)
+                except Exception as e:
+                    raise e
+                
+            with open(self.upload_path, "w", encoding="utf-8") as f:
+                f.write(str(metadata))
+
+        logging.info(f"Upload metadata success")
 
     def report(self) -> None:
         '''Check backup status, compile it to json metadata file and upload'''
@@ -136,12 +162,18 @@ class DockerPostgresBackupReporter(BackupReporter):
         self.metadata.last_backup_date = str(self.metadata.last_backup_date)
 
         self.metadata.count_of_backups = f"{len(wal_show[0]['backups'])} total / {full_backup_count} full / {incremental_backup_count} incremental"
+        
+        bucket_name = urlparse(self.s3_path).netloc
+        self.metadata.placement = bucket_name
 
-        s3_path = "/".join(self.s3_path.split("/")[:3])
-        self.metadata.placement = s3_path
+        if self.upload_path:
+            self.metadata.format = self.upload_path.split('.')[-1]
+        elif self.s3_path:
+            self.metadata.format = self.s3_path.split('.')[-1]
 
         logging.info("Gather metadata success")
         logging.debug(self.metadata)
+
         return self.metadata
 
 
@@ -159,7 +191,9 @@ class FilesBucketReporterBackupReporter(BackupReporter):
             supposed_backups_count: str,
             description: str,
             files_mask: str,
-            aws_endpoint_url: str = None) -> None:
+            aws_endpoint_url: str = None,
+            destination_type: str = "s3",
+            upload_path: Path = None) -> None:
 
         super().__init__(
             aws_access_key_id = aws_access_key_id,
@@ -170,7 +204,9 @@ class FilesBucketReporterBackupReporter(BackupReporter):
             supposed_backups_count = supposed_backups_count,
             type = "FilesBucket",
             description = description,
-            aws_endpoint_url = aws_endpoint_url)
+            aws_endpoint_url = aws_endpoint_url,
+            destination_type = destination_type,
+            upload_path = upload_path)
 
         self.metadata.last_backup_date = None
         self.files_mask = files_mask
@@ -190,20 +226,21 @@ class FilesBucketReporterBackupReporter(BackupReporter):
             **{k:v for k,v in kwargs.items() if v is not None}
         )
 
-        bucket_name = self.s3_path.split("/")[2]
+        bucket_name = urlparse(self.s3_path).netloc
         s3 = s3.Bucket(bucket_name)
 
         latest_backup = {"key": None, "last_modified": datetime(2000, 1, 1, tzinfo=pytz.UTC), "size": 0} # Default latest backup
         count_of_backups = 0
         # Get latest backup file
-        for object in s3.objects.all():
-            if fnmatch(object.key, self.files_mask): # Check if object name matches with files mask from config file
-                if latest_backup["last_modified"] < object.last_modified:
-                    latest_backup = {"key": object.key, "last_modified": object.last_modified, "size": object.size}
+        for obj in s3.objects.all():
+            name = os.path.basename(obj.key)
+            if fnmatch(name, self.files_mask): # Check if object name matches with files mask from config file
+                if latest_backup["last_modified"] < obj.last_modified:
+                    latest_backup = {"key": obj.key, "last_modified": obj.last_modified, "size": obj.size}
                 self.metadata.backups.append(BackupFileInfo(
-                    size=round(object.size/1024/1024, 1),
-                    backup_date=object.last_modified,
-                    backup_name=object.key
+                    size=round(obj.size/1024/1024, 1),
+                    backup_date=obj.last_modified,
+                    backup_name=obj.key
                 ))
                 count_of_backups += 1
 
@@ -213,6 +250,11 @@ class FilesBucketReporterBackupReporter(BackupReporter):
         self.metadata.placement = bucket_name
         self.metadata.size = round(latest_backup["size"]/1024/1024, 1)
         self.metadata.time = 0
+
+        if self.upload_path:
+            self.metadata.format = self.upload_path.split('.')[-1]
+        elif self.s3_path:
+            self.metadata.format = self.s3_path.split('.')[-1]
 
         return self.metadata
 
@@ -231,7 +273,9 @@ class FilesReporterBackupReporter(BackupReporter):
             description: str,
             files_mask: str,
             backups_dir: str,
-            aws_endpoint_url: str = None) -> None:
+            aws_endpoint_url: str = None,
+            destination_type: str = "s3",
+            upload_path: Path = None) -> None:
 
         super().__init__(
             aws_access_key_id = aws_access_key_id,
@@ -242,7 +286,9 @@ class FilesReporterBackupReporter(BackupReporter):
             supposed_backups_count = supposed_backups_count,
             type = "Files",
             description = description,
-            aws_endpoint_url = aws_endpoint_url)
+            aws_endpoint_url = aws_endpoint_url,
+            destination_type = destination_type,
+            upload_path = upload_path)
 
         self.files_mask = files_mask
         self.backups_dir = backups_dir
@@ -292,10 +338,16 @@ class FilesReporterBackupReporter(BackupReporter):
             self.metadata.size = round(latest_backup["size"]/1024/1024, 1)
             self.metadata.time = 0
             self.metadata.sha1sum = latest_backup["sha1sum"]
+            if self.upload_path:
+                self.metadata.format = self.upload_path.split('.')[-1]
+            elif self.s3_path:
+                self.metadata.format = self.s3_path.split('.')[-1]
 
         logging.info("Gather metadata success")
         logging.debug(self.metadata)
+
         return self.metadata
+
 
 class S3MariadbBackupReporter(BackupReporter):
     '''
@@ -310,7 +362,9 @@ class S3MariadbBackupReporter(BackupReporter):
             customer: str,
             supposed_backups_count: str,
             description: str,
-            aws_endpoint_url: str = None) -> None:
+            aws_endpoint_url: str = None,
+            destination_type: str = "s3",
+            upload_path: Path = None) -> None:
 
         super().__init__(
             aws_access_key_id = aws_access_key_id,
@@ -321,7 +375,9 @@ class S3MariadbBackupReporter(BackupReporter):
             supposed_backups_count = supposed_backups_count,
             type = "DockerMariadb",
             description = description,
-            aws_endpoint_url = aws_endpoint_url)
+            aws_endpoint_url = aws_endpoint_url,
+            destination_type = destination_type,
+            upload_path = upload_path)
 
         self.metadata.last_backup_date = None
 
@@ -371,4 +427,9 @@ class S3MariadbBackupReporter(BackupReporter):
         self.metadata.placement = bucket_name
         self.metadata.size = round(backup_total_size/1024/1024, 1)
         self.metadata.time = 0
+        if self.upload_path:
+            self.metadata.format = self.upload_path.split('.')[-1]
+        elif self.s3_path:
+            self.metadata.format = self.s3_path.split('.')[-1]
+
         return self.metadata

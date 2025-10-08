@@ -1,6 +1,7 @@
-import argparse
 import sys
 import logging
+import argparse
+
 import backup_reporter.reporters as rps
 
 from backup_reporter.collector import BackupCollector
@@ -44,7 +45,9 @@ def start():
             customer = confs.get("customer", None),
             supposed_backups_count = confs.get("supposed_backups_count", None),
             aws_endpoint_url = confs["bucket"][0].get("aws_endpoint_url", None),
-            description = confs.get("description", None)
+            description = confs.get("description", None),
+            destination_type = confs["destination"][0].get("type", "s3"),
+            upload_path = confs["destination"][0].get("path", None)
         )
         reporter.report()
 
@@ -59,7 +62,9 @@ def start():
             supposed_backups_count = confs.get("supposed_backups_count", None),
             aws_endpoint_url = confs["bucket"][0].get("aws_endpoint_url", None),
             description = confs.get("description", None),
-            files_mask = confs.get("files_mask", None)
+            files_mask = confs.get("files_mask", None),
+            destination_type = confs["destination"][0].get("type", "s3"),
+            upload_path = confs["destination"][0].get("path", None)
         )
         reporter.report()
 
@@ -75,7 +80,9 @@ def start():
             aws_endpoint_url = confs["bucket"][0].get("aws_endpoint_url", None),
             description = confs.get("description", None),
             files_mask = confs.get("files_mask", None),
-            backups_dir = confs.get("backups_dir", None)
+            backups_dir = confs.get("backups_dir", None),
+            destination_type = confs["destination"][0].get("type", "s3"),
+            upload_path = confs["destination"][0].get("path", None)
         )
         reporter.report()
 
@@ -90,6 +97,8 @@ def start():
             supposed_backups_count = confs.get("supposed_backups_count", None),
             aws_endpoint_url = confs["bucket"][0].get("aws_endpoint_url", None),
             description = confs.get("description", None),
+            destination_type = confs["destination"][0].get("type", "s3"),
+            upload_path = confs["destination"][0].get("path", None)
         )
         reporter.report()
 
