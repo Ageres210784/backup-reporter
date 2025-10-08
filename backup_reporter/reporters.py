@@ -252,7 +252,7 @@ class FilesBucketReporterBackupReporter(BackupReporter):
         self.metadata.time = 0
 
         if self.upload_path:
-            self.metadata.format = self.upload_path.suffix
+            self.metadata.format = self.upload_path.suffix.split('.')[-1]
         elif self.s3_path:
             self.metadata.format = self.s3_path.split('.')[-1]
 
@@ -339,7 +339,7 @@ class FilesReporterBackupReporter(BackupReporter):
             self.metadata.time = 0
             self.metadata.sha1sum = latest_backup["sha1sum"]
             if self.upload_path:
-                self.metadata.format = self.upload_path.suffix
+                self.metadata.format = self.upload_path.suffix.split('.')[-1]
             elif self.s3_path:
                 self.metadata.format = self.s3_path.split('.')[-1]
 
@@ -428,7 +428,7 @@ class S3MariadbBackupReporter(BackupReporter):
         self.metadata.size = round(backup_total_size/1024/1024, 1)
         self.metadata.time = 0
         if self.upload_path:
-            self.metadata.format = self.upload_path.suffix
+            self.metadata.format = self.upload_path.suffix.split('.')[-1]
         elif self.s3_path:
             self.metadata.format = self.s3_path.split('.')[-1]
 

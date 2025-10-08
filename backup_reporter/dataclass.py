@@ -38,6 +38,8 @@ class BackupMetadata:
             return json.dumps(asdict(self), default=str)
         elif self.format == "prom":
             return self.__get_prom_format()
+        else:
+            print(f"Got {self.format}, need json or prom")
     
     def __get_prom_format(self):
         prom_lines = []
