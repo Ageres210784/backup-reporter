@@ -233,8 +233,7 @@ class FilesBucketReporterBackupReporter(BackupReporter):
         count_of_backups = 0
         # Get latest backup file
         for obj in s3.objects.all():
-            name = os.path.basename(obj.key)
-            if fnmatch(name, self.files_mask): # Check if object name matches with files mask from config file
+            if fnmatch(obj.key, self.files_mask): # Check if object name matches with files mask from config file
                 if latest_backup["last_modified"] < obj.last_modified:
                     latest_backup = {"key": obj.key, "last_modified": obj.last_modified, "size": obj.size}
                 self.metadata.backups.append(BackupFileInfo(
