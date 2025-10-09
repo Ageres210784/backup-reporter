@@ -1,9 +1,9 @@
 # Backup Reporter
 
 This repository contains source code for backup reporter tool. That tool can
-collect backup information, upload it to S3 buckets, then collect bunch of
+collect backup information, upload it to S3 buckets or host, then collect bunch of
 backup information files, get them together into one csv file and upload it to
-google spreadsheet.
+google spreadsheet. Can save information to `json` and `prom` format.
 
 Backup reporter has two working modes: reporter and collector.
 
@@ -31,18 +31,21 @@ file. Possible configuration options you can find by typing `backup-reporter
 argument.
 All options from cli-help are same for config-file. As example following
 command:
-- `python3 main.py --bucket="{'s3_path':
+
+- `python3 main.py --destination="{'type': 's3'}" --bucket="{'s3_path':
   's3://bucket_name/in_bucket_path/metadata_file_name.txt',
   'aws_access_key_id': 'key', 'aws_secret_access_key': 'key', 'aws_region':
   'region'}" --docker_postgres`
 
 can be written in file:
-```
+
+```yml
 docker_postgres: true
 bucket:
     - s3_path: s3://bucket_name/in_bucket_path/metadata_file_name.txt
       aws_access_key_id: key
       aws_secret_access_key: key
+      aws_endpoint_url: url
       aws_region: region
       customer: "Customer name"
 ```
@@ -55,7 +58,7 @@ Collector can be configured the same way as reporter - with arguments passed to
 executable file or with config file (which, though, has to be passed as
 argument too). Example of config for collector with comments:
 
-```
+```yml
 # Sheet owner is an email of user to whom ownership will be transfered
 sheet_owner: s@example.com
 
