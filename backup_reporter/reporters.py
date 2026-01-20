@@ -33,7 +33,7 @@ class BackupReporter(ABC):
             aws_endpoint_url: str = None,
             destination_type: str = "s3",
             upload_path = str) -> None:
-        
+
         self.aws_access_key_id = aws_access_key_id
         self.aws_secret_access_key = aws_secret_access_key
         self.aws_region = aws_region
@@ -74,7 +74,7 @@ class BackupReporter(ABC):
             bucket_name = urlparse(self.s3_path).netloc
 
             content_type = "text/plain; version=0.0.4" if metadata.format == "prom" else "application/json"
-            
+
             s3.Object(bucket_name, metadata_file_name).put(Body=str(metadata), ContentType=content_type)
 
         elif self.destination_type == "host":
@@ -85,7 +85,7 @@ class BackupReporter(ABC):
                     metadata_dir.mkdir(parents=True, exist_ok=True)
                 except Exception as e:
                     raise e
-                
+
             with open(self.upload_path, "w", encoding="utf-8") as f:
                 f.write(str(metadata))
 
@@ -112,7 +112,9 @@ class DockerPostgresBackupReporter(BackupReporter):
             customer: str,
             supposed_backups_count: str,
             description: str,
-            aws_endpoint_url: str = None) -> None:
+            aws_endpoint_url: str = None,
+            destination_type: str = "s3",
+            upload_path: str = None) -> None:
 
         super().__init__(
             aws_access_key_id = aws_access_key_id,
@@ -123,7 +125,9 @@ class DockerPostgresBackupReporter(BackupReporter):
             supposed_backups_count = supposed_backups_count,
             type = "DockerPostgres",
             description = description,
-            aws_endpoint_url = aws_endpoint_url)
+            aws_endpoint_url = aws_endpoint_url,
+            destination_type = destination_type,
+            upload_path = upload_path)
 
         self.container_name = container_name
         self.metadata.last_backup_date = None
@@ -137,7 +141,7 @@ class DockerPostgresBackupReporter(BackupReporter):
         last_full_backup_date = None
         incremental_backup_count = 0
         for backup in wal_show[0]['backups']:
-            backup_time = datetime.strptime(backup.get('time'), '%Y-%m-%dT%H:%M:%SZ')
+            backup_time = datetime.strptime(backup.get('time').rstrip('Z').split('.')[0] + 'Z', '%Y-%m-%dT%H:%M:%SZ')
             backup_time = backup_time.replace(tzinfo=pytz.UTC, microsecond=0)
             if not self.metadata.last_backup_date or backup_time > self.metadata.last_backup_date:
                 self.metadata.last_backup_date = backup_time  # Beware, this is ALWAYS about LAST backup - full or incremental
@@ -162,14 +166,11 @@ class DockerPostgresBackupReporter(BackupReporter):
         self.metadata.last_backup_date = str(self.metadata.last_backup_date)
 
         self.metadata.count_of_backups = f"{len(wal_show[0]['backups'])} total / {full_backup_count} full / {incremental_backup_count} incremental"
-        
+
         bucket_name = urlparse(self.s3_path).netloc
         self.metadata.placement = bucket_name
 
-        if self.upload_path:
-            self.metadata.format = self.upload_path.split('.')[-1]
-        elif self.s3_path:
-            self.metadata.format = self.s3_path.split('.')[-1]
+        self.metadata.format = self.s3_path.split('.')[-1]
 
         logging.info("Gather metadata success")
         logging.debug(self.metadata)
