@@ -58,14 +58,15 @@ class BackupMetadata:
             labels.append(f'sha1sum="{self.sha1sum}"')
 
         prom_lines.append("# HELP backup_info Static labels about backup")
-        prom_lines.append("# TYPE backup_info info")
+        prom_lines.append("# TYPE backup_info gauge")
         prom_lines.append(f'backup_info{{{",".join(labels)}}} 1')
 
         prom_lines.append("# HELP backup_size_mb Size of last backup in MB")
         prom_lines.append("# TYPE backup_size_mb gauge")
-        prom_lines.append(f"backup_size_mb{{customer='{self.customer}'}} {float(self.size)}")
-            
+        prom_lines.append(f'backup_size_mb{{customer="{self.customer}"}} {float(self.size)}')
+
         prom_lines.append("# HELP backup_time Time when backup upload")
+        prom_lines.append("# TYPE backup_time gauge")
         prom_lines.append(f"backup_time{{customer='{self.customer}'}} {self.time}")
 
         if self.last_backup_date:
