@@ -67,7 +67,7 @@ class BackupMetadata:
 
         prom_lines.append("# HELP backup_time Time when backup upload")
         prom_lines.append("# TYPE backup_time gauge")
-        prom_lines.append(f"backup_time{{customer='{self.customer}'}} {self.time}")
+        prom_lines.append(f'backup_time{{customer="{self.customer}"}} {self.time}')
 
         if self.last_backup_date:
             # если строка формата ISO8601
