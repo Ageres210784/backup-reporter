@@ -63,23 +63,23 @@ class BackupMetadata:
 
         prom_lines.append("# HELP backup_size_mb Size of last backup in MB")
         prom_lines.append("# TYPE backup_size_mb gauge")
-        prom_lines.append(f'backup_size_mb{{customer="{self.customer}"}} {float(self.size)}')
+        prom_lines.append(f'backup_size_mb{{customer="{self.customer}",backup_name="{self.backup_name}"}} {float(self.size)}')
 
         prom_lines.append("# HELP backup_time Time when backup upload")
         prom_lines.append("# TYPE backup_time gauge")
-        prom_lines.append(f'backup_time{{customer="{self.customer}"}} {self.time}')
+        prom_lines.append(f'backup_time{{customer="{self.customer}",backup_name="{self.backup_name}"}} {self.time}')
 
         if self.last_backup_date:
             # если строка формата ISO8601
             dt = datetime.datetime.fromisoformat(str(self.last_backup_date).replace("Z","+00:00"))
             prom_lines.append("# HELP last_backup_timestamp Unix timestamp of last backup")
             prom_lines.append("# TYPE last_backup_timestamp gauge")
-            prom_lines.append(f'last_backup_timestamp{{customer="{self.customer}"}} {int(dt.timestamp())}')
+            prom_lines.append(f'last_backup_timestamp{{customer="{self.customer}",backup_name="{self.backup_name}"}} {int(dt.timestamp())}')
 
         if self.count_of_backups:
             prom_lines.append("# HELP backup_count Number of backups found")
             prom_lines.append("# TYPE backup_count gauge")
-            prom_lines.append(f'backup_count{{customer="{self.customer}"}} {int(self.count_of_backups)}')
+            prom_lines.append(f'backup_count{{customer="{self.customer}",backup_name="{self.backup_name}"}} {int(self.count_of_backups)}')
 
         if self.supposed_backups_count:
             prom_lines.append("# HELP supposed_backups_count Expected number of backups")
