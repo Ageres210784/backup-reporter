@@ -170,7 +170,10 @@ class DockerPostgresBackupReporter(BackupReporter):
         bucket_name = urlparse(self.s3_path).netloc
         self.metadata.placement = bucket_name
 
-        self.metadata.format = self.s3_path.split('.')[-1]
+        if self.upload_path:
+            self.metadata.format = self.upload_path.suffix.split('.')[-1]
+        elif self.s3_path:
+            self.metadata.format = self.s3_path.split('.')[-1]
 
         logging.info("Gather metadata success")
         logging.debug(self.metadata)

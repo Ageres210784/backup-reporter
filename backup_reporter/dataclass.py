@@ -31,7 +31,7 @@ class BackupMetadata:
     supposed_backups_count: str = None
     sha1sum: str = None
     backups: list[BackupFileInfo] = field(default_factory=list)
-    
+
     def __str__(self):
         '''String representation of that DataClass is valid json string'''
         if self.format == "json":
@@ -40,7 +40,7 @@ class BackupMetadata:
             return self.__get_prom_format()
         else:
             print(f"Got {self.format}, need json or prom")
-    
+
     def __get_prom_format(self):
         prom_lines = []
 
@@ -79,7 +79,10 @@ class BackupMetadata:
         if self.count_of_backups:
             prom_lines.append("# HELP backup_count Number of backups found")
             prom_lines.append("# TYPE backup_count gauge")
-            prom_lines.append(f'backup_count{{customer="{self.customer}",backup_name="{self.backup_name}"}} {int(self.count_of_backups)}')
+            try:
+                prom_lines.append(f'backup_count{{customer="{self.customer}",backup_name="{self.backup_name}"}} {int(self.count_of_backups)}')
+            except ValueError as exc:
+                prom_lines.append(f'backup_count{{customer="{self.customer}",backup_name="{self.backup_name}"}} {int(self.count_of_backups.split(" ")[0])}')
 
         if self.supposed_backups_count:
             prom_lines.append("# HELP supposed_backups_count Expected number of backups")
@@ -87,4 +90,3 @@ class BackupMetadata:
             prom_lines.append(f'supposed_backups_count{{customer="{self.customer}"}} {int(self.supposed_backups_count)}')
 
         return "\n".join(prom_lines) + "\n"
-    
