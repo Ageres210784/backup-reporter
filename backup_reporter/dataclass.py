@@ -84,19 +84,20 @@ class BackupMetadata:
             prom_lines.append(f'last_backup_timestamp{{{base_label_str},backup_name="{self.backup_name}"}} {int(dt.timestamp())}')
 
         if self.backups:
+            prom_lines.append("# HELP backup_file_size_mb Size of backup file in MB")
+            prom_lines.append("# TYPE backup_file_size_mb gauge")
+            prom_lines.append("# HELP backup_file_date_timestamp Unix timestamp of backup file")
+            prom_lines.append("# TYPE backup_file_date_timestamp gauge")
+
             for backup in self.backups:
                 safe_name = backup.backup_name.replace('"', '\\"')
                 file_labels = base_label_str + f',backup_name="{safe_name}"'
                 if backup.sha1sum:
                     file_labels += f',sha1sum="{backup.sha1sum}"'
 
-                prom_lines.append("# HELP backup_file_size_mb Size of backup file in MB")
-                prom_lines.append("# TYPE backup_file_size_mb gauge")
                 if backup.size is not None:
                     prom_lines.append(f'backup_file_size_mb{{{file_labels}}} {float(backup.size)}')
 
-                prom_lines.append("# HELP backup_file_date_timestamp Unix timestamp of backup file")
-                prom_lines.append("# TYPE backup_file_date_timestamp gauge")
                 if backup.backup_date:
                     try:
                         dt = datetime.datetime.fromisoformat(str(backup.backup_date).replace("Z","+00:00"))
