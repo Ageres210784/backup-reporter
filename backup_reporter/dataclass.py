@@ -50,7 +50,7 @@ class BackupMetadata:
         if self.placement:
             base_labels.append(f'placement="{self.placement}"')
         if self.description:
-            base_labels.append(f'description="{self.description}"')
+            base_labels.append(f'br_description="{self.description}"')
 
         base_label_str = ",".join(base_labels)
 
